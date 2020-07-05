@@ -24,6 +24,10 @@ class Clipboard {
   ]
 
   private var changeCount: Int
+  private var accessibilityAllowed: Bool {
+    let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true]
+    return AXIsProcessTrustedWithOptions(options)
+  }
 
   init() {
     changeCount = pasteboard.changeCount
@@ -55,7 +59,10 @@ class Clipboard {
 
   // Based on https://github.com/Clipy/Clipy/blob/develop/Clipy/Sources/Services/PasteService.swift.
   func paste() {
-    checkAccessibilityPermissions()
+    guard accessibilityAllowed else {
+      Maccy.returnFocusToPreviousApp = false
+      return
+    }
 
     DispatchQueue.main.async {
       let vCode = UInt16(kVK_ANSI_V)
@@ -110,16 +117,10 @@ class Clipboard {
     changeCount = pasteboard.changeCount
   }
 
-  private func checkAccessibilityPermissions() {
-    let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true]
-    AXIsProcessTrustedWithOptions(options)
-  }
-
   private func shouldIgnore(_ types: [NSPasteboard.PasteboardType]) -> Bool {
     let ignoredTypes = self.ignoredTypes.union(UserDefaults.standard.ignoredPasteboardTypes)
     let passedTypes = Set(types.map({ $0.rawValue }))
     return passedTypes.isDisjoint(with: supportedTypes) || !passedTypes.isDisjoint(with: ignoredTypes)
-
   }
 
   private func isEmptyString(_ item: NSPasteboardItem) -> Bool {
